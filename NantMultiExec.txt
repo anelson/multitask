@@ -1,0 +1,226 @@
+Nant rc3 solution broken down into multiple projects
+
+Nant.Core contains core Nant classes
+Nant.Core.Tasks contains built-in tasks
+
+<foreach> is closest to what I want; it executes code within a <do> 
+subelement multiple times.  Instead of doing this sequentially, I want it 
+to run concurrently, but otherwise the functionality is the same.
+
+<foreach> is defined in Nant.Core/Tasks/LoopTask.cs.  Its base class, 
+TaskContainer, is where the actual logic that runs embedded tasks is 
+found.
+
+The <do> element is simply a TaskContainer instance, exposed as a 
+BuildElement of the <foreach> task.  It's actually not clear why <foreach> 
+would be a TaskContainer as well, when <do> is where the magic happens.
+
+Ah, I guess so you don't have to provide a <do> element.  Perhaps for 
+backwards compatibility.
+
+What I want is something like this:
+
+<multitasks> can contain any tasks; they run as usual, sequentially.
+
+If during the execution of the tasks in <multitasks>, a <multitask> 
+element is encountered, then all tasks within that element are run 
+sequentially, but in another thread.  The original thread continues as 
+though the <multitask> element was not encountered.
+
+At the end of the <multitasks> element, execution pauses until all 
+outstanding <multitask> runs complete.
+
+This allows for some fairly sophisticated uses:
+
+<multitasks>
+	<if ....>
+		<foreach ...>
+		
+			<do...
+			
+				<multitask...>
+</multitasks>
+
+And so on.
+
+It's not clear how properties set in a <multitask> will be copied back 
+into the main execution.  I'll get it working first, and worry about 
+thread-safety later.
+
+NANT Build Drama:
+
+rc3 doesn't build under .NET Framework 2.0, due to deprecated methods.  
+The nightly builds do, so I switched to one of them.
+
+Building nant in vs2k5 has a gotcha.
+
+When I first build, I get this error:
+
+	------ Build started: Project: NAnt.Console, Configuration: Debug Main NAnt BuildFile Any CPU ------
+	c:\WINDOWS\Microsoft.NET\Framework\v2.0.50727\Csc.exe /noconfig /unsafe- /checked- /nowarn:1701,1702 /errorreport:prompt /warn:4 /doc:NAnt.xml /baseaddress:285212672 /reference:..\..\lib\log4net.dll /reference:c:\WINDOWS\Microsoft.NET\Framework\v2.0.50727\mscorlib.dll /reference:G:\SourceCode\nant-0.85-nightly-2005-12-03\build.VS.NET\NAnt.Compression\NAnt.CompressionTasks.dll /reference:G:\SourceCode\nant-0.85-nightly-2005-12-03\build.VS.NET\NAnt.Core\NAnt.Core.dll /reference:G:\SourceCode\nant-0.85-nightly-2005-12-03\build.VS.NET\NAnt.DotNet\NAnt.DotNetTasks.dll /reference:G:\SourceCode\nant-0.85-nightly-2005-12-03\build.VS.NET\NAnt.MSNet\NAnt.MSNetTasks.dll /reference:G:\SourceCode\nant-0.85-nightly-2005-12-03\build.VS.NET\NAnt.NUnit\NAnt.NUnit.dll /reference:G:\SourceCode\nant-0.85-nightly-2005-12-03\build.VS.NET\NAnt.NUnit1\NAnt.NUnit1Tasks.dll /reference:G:\SourceCode\nant-0.85-nightly-2005-12-03\build.VS.NET\NAnt.NUnit2\NAnt.NUnit2Tasks.dll /reference:G:\SourceCode\nant-0.85-nightly-2005-12-03\build.VS.NET\NAnt.SourceControl\NAnt.SourceControlTasks.dll /reference:G:\SourceCode\nant-0.85-nightly-2005-12-03\build.VS.NET\NAnt.VisualCpp\NAnt.VisualCppTasks.dll /reference:G:\SourceCode\nant-0.85-nightly-2005-12-03\build.VS.NET\NAnt.VSNet\NAnt.VSNetTasks.dll /reference:G:\SourceCode\nant-0.85-nightly-2005-12-03\build.VS.NET\NAnt.Win32\Nant.Win32Tasks.dll /reference:G:\SourceCode\nant-0.85-nightly-2005-12-03\build.VS.NET\NDoc.Documenter.NAnt\NDoc.Documenter.NAnt.dll /reference:c:\WINDOWS\Microsoft.NET\Framework\v2.0.50727\System.dll /reference:c:\WINDOWS\Microsoft.NET\Framework\v2.0.50727\System.Xml.dll /debug+ /debug:full /filealign:4096 /optimize- /out:"obj\Debug Main NAnt BuildFile\NAnt.exe" /target:exe /warnaserror+ ..\CommonAssemblyInfo.cs AssemblyInfo.cs ConsoleStub.cs
+	error CS0006: Metadata file 'G:\SourceCode\nant-0.85-nightly-2005-12-03\build.VS.NET\NAnt.MSNet\NAnt.MSNetTasks.dll' could not be found
+	
+	Compile complete -- 1 errors, 0 warnings
+
+For some reason, when it attempts to link to NAnt.MSNetTasks.dll, it 
+fails.  Not clear from a Google search that this is a known issue.
+
+Looking further up in the output, I see this:
+
+	------ Skipped Build: Project: NAnt.MSNet, Configuration: Debug Any CPU ------
+	Project not selected to build for this solution configuration 
+
+And yet, Nant.Console is dependent upon NAnt.MSNet in the build settings.  
+Lame.  For some reason, NAnt.MSNet is the only project in the solution 
+which is not enabled under the  'Debug Main Nant BuildFile' 
+configuration.	The 'Debug' configuration, however, works fine.
+
+Even with the nightly build, Nant.Console won't compile:
+
+	------ Build started: Project: NAnt.Console, Configuration: Debug Any CPU ------
+	c:\WINDOWS\Microsoft.NET\Framework\v2.0.50727\Csc.exe /noconfig /unsafe- /checked- /nowarn:1701,1702 /nostdlib- /errorreport:prompt /warn:4 /doc:NAnt.xml /baseaddress:285212672 /reference:..\..\lib\log4net.dll /reference:c:\WINDOWS\Microsoft.NET\Framework\v2.0.50727\mscorlib.dll /reference:G:\SourceCode\nant-0.85-nightly-2005-12-03\build.VS.NET\NAnt.Compression\NAnt.CompressionTasks.dll /reference:G:\SourceCode\nant-0.85-nightly-2005-12-03\build.VS.NET\NAnt.Core\NAnt.Core.dll /reference:G:\SourceCode\nant-0.85-nightly-2005-12-03\build.VS.NET\NAnt.DotNet\NAnt.DotNetTasks.dll /reference:G:\SourceCode\nant-0.85-nightly-2005-12-03\build.VS.NET\NAnt.MSNet\NAnt.MSNetTasks.dll /reference:G:\SourceCode\nant-0.85-nightly-2005-12-03\build.VS.NET\NAnt.NUnit\NAnt.NUnit.dll /reference:G:\SourceCode\nant-0.85-nightly-2005-12-03\build.VS.NET\NAnt.NUnit1\NAnt.NUnit1Tasks.dll /reference:G:\SourceCode\nant-0.85-nightly-2005-12-03\build.VS.NET\NAnt.NUnit2\NAnt.NUnit2Tasks.dll /reference:G:\SourceCode\nant-0.85-nightly-2005-12-03\build.VS.NET\NAnt.SourceControl\NAnt.SourceControlTasks.dll /reference:G:\SourceCode\nant-0.85-nightly-2005-12-03\build.VS.NET\NAnt.VisualCpp\NAnt.VisualCppTasks.dll /reference:G:\SourceCode\nant-0.85-nightly-2005-12-03\build.VS.NET\NAnt.VSNet\NAnt.VSNetTasks.dll /reference:G:\SourceCode\nant-0.85-nightly-2005-12-03\build.VS.NET\NAnt.Win32\Nant.Win32Tasks.dll /reference:G:\SourceCode\nant-0.85-nightly-2005-12-03\build.VS.NET\NDoc.Documenter.NAnt\NDoc.Documenter.NAnt.dll /reference:c:\WINDOWS\Microsoft.NET\Framework\v2.0.50727\System.dll /reference:c:\WINDOWS\Microsoft.NET\Framework\v2.0.50727\System.Xml.dll /debug+ /debug:full /filealign:4096 /optimize- /out:obj\Debug\NAnt.exe /target:exe /warnaserror+ ..\CommonAssemblyInfo.cs AssemblyInfo.cs ConsoleStub.cs
+	G:\SourceCode\nant-0.85-nightly-2005-12-03\src\Nant.Console\ConsoleStub.cs(64,46): error CS0618: Warning as Error: 'System.Configuration.ConfigurationSettings.GetConfig(string)' is obsolete: 'This method is obsolete, it has been replaced by System.Configuration!System.Configuration.ConfigurationManager.GetSection'
+	G:\SourceCode\nant-0.85-nightly-2005-12-03\src\Nant.Console\ConsoleStub.cs(107,49): error CS0618: Warning as Error: 'System.Configuration.ConfigurationSettings.AppSettings' is obsolete: 'This method is obsolete, it has been replaced by System.Configuration!System.Configuration.ConfigurationManager.AppSettings'
+	G:\SourceCode\nant-0.85-nightly-2005-12-03\src\Nant.Console\ConsoleStub.cs(108,56): error CS0618: Warning as Error: 'System.Configuration.ConfigurationSettings.AppSettings' is obsolete: 'This method is obsolete, it has been replaced by System.Configuration!System.Configuration.ConfigurationManager.AppSettings'
+	G:\SourceCode\nant-0.85-nightly-2005-12-03\src\Nant.Console\ConsoleStub.cs(324,21): error CS0618: Warning as Error: 'System.AppDomain.AppendPrivatePath(string)' is obsolete: 'AppDomain.AppendPrivatePath has been deprecated. Please investigate the use of AppDomainSetup.PrivateBinPath instead. http://go.microsoft.com/fwlink/?linkid=14202'
+	G:\SourceCode\nant-0.85-nightly-2005-12-03\src\Nant.Console\ConsoleStub.cs(333,25): error CS0618: Warning as Error: 'System.AppDomain.AppendPrivatePath(string)' is obsolete: 'AppDomain.AppendPrivatePath has been deprecated. Please investigate the use of AppDomainSetup.PrivateBinPath instead. http://go.microsoft.com/fwlink/?linkid=14202'
+
+I had to set 'Treat Warnings As Errors' to 'None', so these warnings would not fail the build.  Lame.
+
+I've created a .build file which exercises MultiTaskTest.  Without 
+implementing any logic, and simply creating the two tasks as subclasses of 
+TaskContainer, nested tasks within a <multitask> simply run sequentially.
+
+With that working, I can look to implementing concurrency.
+
+I've implemented a simple concurrency, by running 
+TaskContainer.ExecuteChildTasks in a background thread.  This works, but 
+there's a serious snag: within each multitask, I reference the {idx} 
+property, which is the count variable of the foreach loop.  By the time 
+the multitask threads run, the for loop is already done iterating, the the 
+idx property is undefined.
+
+Clearly, I need to implement something akin to fork() on the Project 
+object and its children; that is, take a snapshot of its state at the time 
+of the forking, then allow it to change independently.
+
+I suspected this was coming, but it's not clear to me how to do it.
+
+I'm going to have to implement some sort of deep cloning scheme.
+
+HINT: I found out from reviewing the db4o docs and source code that 
+FormatterServices.GetUninitializedObject can be used to instantiate a type 
+without calling its ctor.  Nice.
+
+Sometime in the middle of debugging a stack overflow exception when trying 
+to deep copy a System.Reflection.Pointer object, it hit me: there's no 
+reason I can't generate a new Nant project, slightly modified to preserve 
+the properties as they are at the time of invocation, then run that new 
+project in a separate thread, with build and log hooks to handle the sync 
+back.
+
+Beautifully, the Nant.Core.Tasks.NantTask does alot of this already.  The 
+main difference is that I want to re-write the project slightly, so only 
+the contents of the currently running <multitask> element are directly 
+executed.  Since these contents could include <call>s to other targets, I 
+may as well keep the rest of the build file around, but not running.
+
+Ok, I've got it working w/ everything but the background thread; in other 
+words, it's still running one-at-a-time, but with the new project for each 
+<multitask>, and seems to be working.
+
+Next, I need to figure out logging; obviously it won't do to have the 
+background threads writing log output directly, it needs to be routed to 
+the primary thread's logging code.  Project.DetachBuildListeners will 
+clear any listeners on the background threads' projects, and it's easy 
+enough to implement IBuildListener to grab all the events and put them 
+into a queue on the primary thread for display later.
+
+However, the only convenient place to dip into this queue and display the 
+log messages is after the execution of a <multitasks> task.  That means 
+for the duration of its execution, which could include multiple 
+<multitask>s and all sorts of long-running operations therein, there would 
+be no log output.  That sucks a whole lot.
+
+Perhaps the <multitasks> element could launch another background thread to 
+feed the log output.  I'll consider that once I've got something basically 
+working.
+
+Ok, I changed nothing other than to run each <multitask> in a background 
+thread, and it works.  I just need to handle logging and I'm done.
+
+First step: implement a mechanism for capturing log events within a 
+<multitasks> element.  My thinking is, <multitasks> will copy off any 
+existing BuildLisenters, and replace with a custom build listener that 
+copies the events to a queue.  <multitask> will do a similar thing with 
+its background thread projects.
+
+Events should be reported in the order they would've occurred if there 
+were no parallelism.  This will be particularly tricky.  Basically, it 
+means there will be one queue for each <multitask>, one for each space 
+between two <multitask>'s, and one each at the space between <multitasks> 
+and the first <multitask>, and between the last <multitask> and the 
+</multitasks>.  Thus:
+
+<multitasks>
+  ** Queue 1
+  ...
+  <multitask>
+	**Queue 2
+	...
+  </multitask>
+  
+  ** Queue 3
+  ...
+  
+  <multitask>
+	** Queue 4
+	..
+  </multitask>
+  
+  ** Queue 5  
+  ..
+  
+</multitasks>
+
+If there were only one <multitask>, but it were executed multiple times 
+due to a <foreach> or something, obviously that would be logged the same 
+was as above.
+
+What complicates matters is that only output from queue n should be 
+displayed, until queue n's input is complete, at which time output from 
+queue n+1 is displayed.  For the queues associated with a <multitask>, the 
+queue's input is complete when the <multitask> finishes running, but for 
+the queues between <multitask>'s, it ends as soon as the next <multitask> 
+starts to run.
+
+Ok, how about this:
+
+Define a subclass of Queue, LogEventQueue, which has a Close method which 
+will mark the queue has closed to new entries.  <multitasks> will maintain 
+a Queue of such queues.
+
+When a <multitasks> element starts child execution it will push a new 
+LogEventQueue into the queue.  When a <multitasks> element stops child 
+execution, it will close the current event queue on the stack.
+
+Whenever a <multitask> element starts, it will close the current 
+LogEventQueue, and create and push a new one for itself.  After a 
+<multitask> starts the background thread, it will create another 
+LogEventQueue and push it behind the one it just created; this will be 
+used for log events following the <multitask> element.  When the 
+<multitask> background thread finishes executing, it will close the queue 
+it had been using.
+
+Under this regime, the log events can be kept in the proper order, and 
+logging output can commence immediately.  There may be stalls, of course, 
+if the <multitask> whose queue is currently the active one stalls on a 
+long-running operation, log events for the tasks following it will be 
+building up, but otherwise log output will be fairly intuitive.
+
+
+  
+TODO: Wire up the bizare queue of queues logic, make <multitasks> create a 
+thread that pumps log messages into the On* methods in Project (thankfully 
+they're public), and make sure that pump thread stops after <multitasks> 
+confirms the conclusion of all child tasks (but not before).
