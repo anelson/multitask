@@ -1,0 +1,45 @@
+<?xml version="1.0"?>
+<project name="MultiTaskTest" default="goforit">
+    <target name="goforit">
+        <!-- Load the multitasks library -->
+        <loadtasks assembly="bin\Debug\multitask.dll" />
+
+        <!-- Define a custom function that will spit out thread information
+        to help us determine when tasks are running in other threads, and
+        another to generate random sleep times -->
+        <script language="C#" prefix="threadfuncs" >
+          <code>
+            <![CDATA[
+              [Function("get-thread-id")]
+              public static string GetThreadId() {
+                  return System.Threading.Thread.CurrentThread.ManagedThreadId.ToString();
+              }
+              
+              [Function("get-rand-sleep-time-ms")]
+              public static string GetRandSleepTimeMs() {
+                  return (new Random()).Next(0, 10000).ToString();
+              }
+            ]]>
+          </code>
+        </script>
+
+        <echo message="About to enter multitasks element; current thread ID ${threadfuncs::get-thread-id()}" />
+
+        <multitasks>
+            <echo message="Running inside multitasks element; current thread ID ${threadfuncs::get-thread-id()}" />
+
+                <foreach item="String" in="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20" delim=" " property="idx">
+                    <echo message="Running loop iteration ${idx};  current thread ID ${threadfuncs::get-thread-id()}" />
+                    
+                    <multitask>
+                        <echo message="In multitask for loop iteration ${idx};  current thread ID ${threadfuncs::get-thread-id()}" />
+                        <property name="sleep-time" value="${threadfuncs::get-rand-sleep-time-ms()}" />
+                        <echo message="About to sleep for ${sleep-time} ms" />
+                        <sleep milliseconds="${sleep-time}" />
+                        <echo message="Finishing multitask for loop iteration ${idx};  current thread ID ${threadfuncs::get-thread-id()}" />
+                    </multitask>
+                </foreach>
+        </multitasks>
+    </target>
+</project>
+

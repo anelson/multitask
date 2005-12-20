@@ -1,0 +1,9 @@
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <StartAction>Program</StartAction>
+    <StartProgram>G:\SourceCode\nant-0.85-nightly-2005-12-03\build.VS.NET\NAnt.Console\NAnt.exe</StartProgram>
+    <StartWorkingDirectory>
+    </StartWorkingDirectory>
+    <StartArguments>-buildfile:..\..\MultiTaskTest.build</StartArguments>
+  </PropertyGroup>
+</Project>
