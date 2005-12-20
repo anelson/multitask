@@ -1,9 +1,0 @@
-obj\Debug\ResolveAssemblyReference.cache
-bin\Debug\MultiTask.dll
-bin\Debug\MultiTask.pdb
-bin\Debug\NAnt.Core.dll
-bin\Debug\log4net.dll
-bin\Debug\NAnt.Core.pdb
-bin\Debug\NAnt.Core.xml
-obj\Debug\MultiTask.dll
-obj\Debug\MultiTask.pdb
