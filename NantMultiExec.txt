@@ -224,3 +224,11 @@ TODO: Wire up the bizare queue of queues logic, make <multitasks> create a
 thread that pumps log messages into the On* methods in Project (thankfully 
 they're public), and make sure that pump thread stops after <multitasks> 
 confirms the conclusion of all child tasks (but not before).
+
+
+---
+
+TODO: Got logging wired.  Need to deal with failure case.  Exception in <multitask>
+should be reported to the log event queue, and the event pump should handle it like
+any other log event.  Key principle is, log output should be consistent with
+serializing <multitask>s.

@@ -17,26 +17,21 @@ namespace MultiTask
     [TaskName("multitask")]
     class MultiTask : TaskContainer {
         /// <summary>The thread on which the async execution of the tasks within the multitask.</summary>
-		Thread _execThread;
-        Project _forkedProj;
+//		Thread _execThread;
+//        Project _forkedProj;
         const String MULTITASK_TARGET_NAME = "multitask-generated-target";
 
-		[ThreadStatic]
-		static DeepCopier _deepCopier = new DeepCopier(new Type[] {
-			typeof(MultiTasks)
-		});
-
-        /// <summary>Blocks the caller until the multitask finishes running.  Returns immediately
-        ///     if the multitask is not currently running.</summary>
-		internal void WaitForCompletion() {
-			if (_execThread != null) {
-				if (_execThread.IsAlive) {
-					_execThread.Join();
-				}
-
-				_execThread = null;
-			}
-		}
+//        /// <summary>Blocks the caller until the multitask finishes running.  Returns immediately
+//        ///     if the multitask is not currently running.</summary>
+//		internal void WaitForCompletion() {
+//			if (_execThread != null) {
+//				if (_execThread.IsAlive) {
+//					_execThread.Join();
+//				}
+//
+//				_execThread = null;
+//			}
+//		}
 
 		/// <summary>
 		/// Automatically exclude build elements that are defined on the task
@@ -47,8 +42,8 @@ namespace MultiTask
 		protected override void InitializeTask(XmlNode taskNode) {
 			base.InitializeTask(taskNode);
 
-			_execThread = null;
-			_forkedProj = null;
+//			_execThread = null;
+//			_forkedProj = null;
 		}
 
 
@@ -60,29 +55,14 @@ namespace MultiTask
 		/// a <see cref="BuildElementAttribute" /> defined.
 		/// </remarks>
 		protected override void ExecuteTask() {
-			//Instead of executing the child tasks synchronously, asynchronously 
-			//invoke ExecuteForkedProject using a background thread.
-
-			//First, find the <multitasks> element containing this element
 			MultiTasks mt = FindMultiTasksAncestor();
-			if (mt == null) {
-				throw new BuildException("multitask cannot be used outside of multitasks", Location);
-			}
-
-			_forkedProj = Fork();			
-
-			//Inform the multitasks task that a multitask child is about to run
-			mt.ReportChildMultiTask(this);
-
-			//And start the thread
-			_execThread = new Thread(new ThreadStart(ExecuteForkedProject));
-			_execThread.Start();
-			//ExecuteForkedProject();
+			Project forkedProj = Fork();			
+			mt.RunProjectAsync("multitask-todo-elaborate", forkedProj, MULTITASK_TARGET_NAME);
 		}
 
-		private void ExecuteForkedProject() {
-            _forkedProj.Execute(MULTITASK_TARGET_NAME);
-		}
+//		private void ExecuteForkedProject() {
+//            _forkedProj.Execute(MULTITASK_TARGET_NAME);
+//		}
 
         /// <summary>Walks the task ancestry looking for the nearest <code>multitasks</code> task.</summary>
         /// 
@@ -99,14 +79,23 @@ namespace MultiTask
                 elem = elem.Parent as Element;
 			}
 
-			return null;
+			throw new BuildException("multitask cannot be used outside of multitasks", Location);
 		}
 
-		private Project Fork() {
+		private Project Fork() {			
+			//Duplicate the current project in a new Project object
+			Project forkedProj = CreateForkedProject();
+
+			Target targ = CreateMultitaskTarget(forkedProj);
+
+			SetDefaultTarget(targ, forkedProj);
+
+            return forkedProj;
+		}
+
+		private Project CreateForkedProject() {
 			//HACK: Had to copy these consts from Project.cs in the nant codebase, 
 			//as they are marked 'internal' and thus not visible outside nant.core
-			const string NAntPlatform = "nant.platform";
-			const string NAntPlatformName = NAntPlatform + ".name";
 			const string NAntPropertyFileName = "nant.filename";
 			const string NAntPropertyVersion = "nant.version";
 			const string NAntPropertyLocation = "nant.location";
@@ -119,25 +108,25 @@ namespace MultiTask
 			
 			//Duplicate the current project in a new Project object
 			Project forkedProj = new Project(Project.Document, 
-											 Project.Threshold, 
-											 Project.IndentationLevel, 
-											 Project.ConfigurationNode);
+				Project.Threshold, 
+				Project.IndentationLevel, 
+				Project.ConfigurationNode);
 
 			
 
-            // have the new project inherit the runtime framework from the 
-            // current project
-            if (Project.RuntimeFramework != null && forkedProj.Frameworks.Contains(Project.RuntimeFramework.Name)) {
-                forkedProj.RuntimeFramework = forkedProj.Frameworks[Project.RuntimeFramework.Name];
-            }
+			// have the new project inherit the runtime framework from the 
+			// current project
+			if (Project.RuntimeFramework != null && forkedProj.Frameworks.Contains(Project.RuntimeFramework.Name)) {
+				forkedProj.RuntimeFramework = forkedProj.Frameworks[Project.RuntimeFramework.Name];
+			}
 
-            // have the new project inherit the current framework from the 
-            // current project 
-            if (Project.TargetFramework != null && forkedProj.Frameworks.Contains(Project.TargetFramework.Name)) {
-                forkedProj.TargetFramework = forkedProj.Frameworks[Project.TargetFramework.Name];
-            }
+			// have the new project inherit the current framework from the 
+			// current project 
+			if (Project.TargetFramework != null && forkedProj.Frameworks.Contains(Project.TargetFramework.Name)) {
+				forkedProj.TargetFramework = forkedProj.Frameworks[Project.TargetFramework.Name];
+			}
 			
-            // have the new project inherit properties from the current project
+			// have the new project inherit properties from the current project
 			StringCollection excludes = new StringCollection();
 			excludes.Add(NAntPropertyFileName);
 			excludes.Add(NAntPropertyLocation);
@@ -153,23 +142,30 @@ namespace MultiTask
 			// pass datatypes thru to the child project
 			forkedProj.DataTypeReferences.Inherit(Project.DataTypeReferences);
 
+			return forkedProj;
+		}
+
+		private Target CreateMultitaskTarget(Project proj) {
+
 			//Create a new target which will contain the tasks from the <multitask>
 			//To preserve line numbers as much as possible, copy the <multitask> branch
 			//and mutate the multitask element into a task element
 
 			XmlNode targetNode = XmlNode.CloneNode(true);
-            XmlAttribute name = targetNode.OwnerDocument.CreateAttribute("name");
-            name.Value = MULTITASK_TARGET_NAME;
-            targetNode.Attributes.Append(name);
+			XmlAttribute name = targetNode.OwnerDocument.CreateAttribute("name");
+			name.Value = MULTITASK_TARGET_NAME;
+			targetNode.Attributes.Append(name);
 
 			Target targ = new Target();
-			targ.Project = forkedProj;
+			targ.Project = proj;
 			targ.NamespaceManager = NamespaceManager;
-            targ.Initialize(targetNode);
+			targ.Initialize(targetNode); 
 
-			forkedProj.Targets.Add(targ);
+			return targ;
+		} 
 
-            return forkedProj;
+		private void SetDefaultTarget(Target targ, Project proj) {
+			proj.Targets.Add(targ);
 		}
     }
 }

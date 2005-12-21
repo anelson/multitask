@@ -2,7 +2,7 @@
 <project name="MultiTaskTest" default="goforit">
     <target name="goforit">
         <!-- Load the multitasks library -->
-        <loadtasks assembly="bin\Debug\multitask.dll" />
+        <loadtasks assembly="bin\Debug\multitasks.dll" />
 
         <!-- Define a custom function that will spit out thread information
         to help us determine when tasks are running in other threads, and
@@ -12,7 +12,7 @@
             <![CDATA[
               [Function("get-thread-id")]
               public static string GetThreadId() {
-                  return System.Threading.Thread.CurrentThread.ManagedThreadId.ToString();
+                  return System.AppDomain.GetCurrentThreadId().ToString();
               }
               
               [Function("get-rand-sleep-time-ms")]
@@ -37,8 +37,14 @@
                         <echo message="About to sleep for ${sleep-time} ms" />
                         <sleep milliseconds="${sleep-time}" />
                         <echo message="Finishing multitask for loop iteration ${idx};  current thread ID ${threadfuncs::get-thread-id()}" />
+
+                        <if test="$idx == 15">
+                            <fail message="15 is all I can take" />
+                        </if>
                     </multitask>
                 </foreach>
+
+                <fail message="After all that, it didn't work" />
         </multitasks>
     </target>
 </project>
