@@ -159,7 +159,7 @@ namespace MultiTask
 			//Add the document to the project's location map.  Normally, Project.Execute()
 			//will do this, however Target.Initialize() needs the location map to be
 			//populated already, so the line number of the Target element can be computed
-			proj.LocationMap.Add(proj.XmlNode.Document);
+			proj.LocationMap.Add(proj.xml.Document);
 
 			Target targ = new Target();
 			targ.Project = proj;
