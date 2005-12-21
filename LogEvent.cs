@@ -11,7 +11,8 @@ namespace MultiTask
 		BuildFinished,
 		TaskFinished,
 		TargetStarted,
-		TaskStarted
+		TaskStarted,
+		Exception
 	};
 	
 	/// <summary>
@@ -22,16 +23,26 @@ namespace MultiTask
 		Object _sender;
 		BuildEventArgs _args;
 		LogEventType _eventType;
+		Exception _exception;
+		Project _project;
 
 		public LogEvent(Object sender, BuildEventArgs args, LogEventType eventType)
 		{
 			_sender = sender;
 			_args = args;
 			_eventType = eventType;
+			_exception = null;
+		}
+
+		public LogEvent(Project project, Exception exception) : this(project, null, LogEventType.Exception) {
+			_project = project;
+			_exception = exception;
 		}
 
 		public Object Sender { get { return _sender; } }
 		public BuildEventArgs Args { get { return _args; } }
 		public LogEventType EventType { get { return _eventType; } }
+		public Exception Exception { get { return _exception; } }
+		public Project Project { get { return _project; } }
 	}
 }

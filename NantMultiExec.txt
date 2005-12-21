@@ -232,3 +232,10 @@ TODO: Got logging wired.  Need to deal with failure case.  Exception in <multita
 should be reported to the log event queue, and the event pump should handle it like
 any other log event.  Key principle is, log output should be consistent with
 serializing <multitask>s.
+
+---
+
+Now it's kind-of working, but working on getting line number info to propagate.
+BaseURI isn't set on Target element, so trying to get it to use existing
+element instead, but still not quite there.
+

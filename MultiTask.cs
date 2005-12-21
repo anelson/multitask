@@ -107,12 +107,10 @@ namespace MultiTask
 			const string NAntPropertyOnFailure = "nant.onfailure";
 			
 			//Duplicate the current project in a new Project object
-			Project forkedProj = new Project(Project.Document, 
+			Project forkedProj = new Project(Project.BuildFileUri.AbsoluteUri, 
 				Project.Threshold, 
 				Project.IndentationLevel, 
 				Project.ConfigurationNode);
-
-			
 
 			// have the new project inherit the runtime framework from the 
 			// current project
@@ -148,18 +146,28 @@ namespace MultiTask
 		private Target CreateMultitaskTarget(Project proj) {
 
 			//Create a new target which will contain the tasks from the <multitask>
-			//To preserve line numbers as much as possible, copy the <multitask> branch
-			//and mutate the multitask element into a task element
+			//To preserve line numbers as much as possible, build the Target object
+			//from the XmlNode for this task; it shouldn't work, but it does, since
+			//the Initialize() method for each NAnt element assumes the node being passed to it
+			//is the right type.
 
-			XmlNode targetNode = XmlNode.CloneNode(true);
-			XmlAttribute name = targetNode.OwnerDocument.CreateAttribute("name");
+			//Add a 'name' property so the 'target' will be identifiable
+			XmlAttribute name = XmlNode.OwnerDocument.CreateAttribute("name");
 			name.Value = MULTITASK_TARGET_NAME;
-			targetNode.Attributes.Append(name);
+			XmlNode.Attributes.Append(name);
+
+			//Add the document to the project's location map.  Normally, Project.Execute()
+			//will do this, however Target.Initialize() needs the location map to be
+			//populated already, so the line number of the Target element can be computed
+			proj.LocationMap.Add(proj.XmlNode.Document);
 
 			Target targ = new Target();
 			targ.Project = proj;
 			targ.NamespaceManager = NamespaceManager;
-			targ.Initialize(targetNode); 
+			targ.Initialize(XmlNode); 
+
+			//Remove the 'name' attribute to get the node back to the way it should be
+			XmlNode.Attributes.Remove(name);
 
 			return targ;
 		} 

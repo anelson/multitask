@@ -23,7 +23,6 @@ namespace MultiTask
 		String _target;
 		Thread _thread;
 		ManualCloseLogEventQueue _logEventQueue;
-		Exception _exception;
 
 		public AsyncProject(Project proj, String target, ManualCloseLogEventQueue q)
 		{
@@ -36,19 +35,16 @@ namespace MultiTask
 		public void Start() {
 			if (_thread == null) {
 				//And start the thread
-				_exception = null;
 				_thread = new Thread(new ThreadStart(ExecuteProjectAsync));
 				_thread.Start();
 			}
 		}
 
-		public Exception WaitForFinish() {
+		public void WaitForFinish() {
 			if (_thread != null) {
 				_thread.Join();
 				_thread = null;
 			}
-
-			return _exception;
 		}
 
 		public bool IsRunning {
@@ -65,7 +61,7 @@ namespace MultiTask
 			try {
 				_project.Execute(_target);
 			} catch (Exception e) {
-				_exception = e;
+				_logEventQueue.Enqueue(new LogEvent(_project, e));
 			} finally {
 				_logEventQueue.Close();
 			}

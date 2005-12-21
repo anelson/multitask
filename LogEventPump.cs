@@ -13,6 +13,7 @@ namespace MultiTask
 		LogEventQueueList _queues;
 		BuildListenerCollection _handlers;
 		Thread _pumpThread;
+		Exception _firstException;
 		volatile bool _stop;
 
 		public LogEventPump(LogEventQueueList queues, BuildListenerCollection handlers)
@@ -20,22 +21,26 @@ namespace MultiTask
 			_queues = queues;
 			_handlers = handlers;
 			_pumpThread = null;
+			_firstException = null;
 			_stop = false;
 		}
 
 		public void Start() {
 			if (_pumpThread == null) {
 				_stop = false;
+				_firstException = null;
 				_pumpThread = new Thread(new ThreadStart(PumpEvents));
 				_pumpThread.Start();
 			}
 		}
 
-		public void Stop() {
+		public Exception Stop() {
 			if (_pumpThread != null) {
 				_stop = true;
 				_pumpThread.Join();
 			}
+
+			return _firstException;
 		}
 
 		private void PumpEvents() {
@@ -81,6 +86,20 @@ namespace MultiTask
 
 			case LogEventType.TaskStarted:
 				bl.TaskStarted(evt.Sender, evt.Args);
+				break;
+
+			case LogEventType.Exception:
+				//If this is the first exception, save it
+				if (_firstException == null) {
+					_firstException = evt.Exception;
+				}
+
+				//Report this in the form of a message
+				BuildEventArgs e = new BuildEventArgs(evt.Project);
+				e.Exception = evt.Exception;
+				e.MessageLevel = Level.Error;
+				e.Message = String.Format("Error running async task: {0}", evt.Exception.Message);
+				bl.MessageLogged(evt.Project, e);
 				break;
 			}
 		}

@@ -93,15 +93,10 @@ namespace MultiTask
 
 				//Wait for anything running in a child <multitask> element to 
 				//finish
-				bool success = WaitForAsyncProjects();
+				WaitForAsyncProjects();
 
 				//Wait for the event pump to finish
 				StopEventPump();
-
-				if (!success) {
-					throw new BuildException("There was an error in a <multitask>", Location);
-				}
-
 			} finally {
 				Project.AttachBuildListeners(prevBuildListeners);
 			}
@@ -114,20 +109,10 @@ namespace MultiTask
 		}
 
         /// <summary>Pauses until all async projects finish executing.</summary>
-		private bool WaitForAsyncProjects() {
-			bool success = true;
-
+		private void WaitForAsyncProjects() {
 			foreach (AsyncProject ap in _asyncProjects) {
-				Exception error = ap.WaitForFinish();
-				if (error != null) {
-					success = false;
-
-					Log(Level.Error, "Error in <multitask>: {0}",
-						error);
-				}
+				ap.WaitForFinish();
 			}
-
-			return success;
 		} 
 
 		private void StartEventPump(BuildListenerCollection handlers) {
@@ -139,8 +124,20 @@ namespace MultiTask
 			_logEventQueueList.Flush();
 
 			if (_eventPump != null) {
-				_eventPump.Stop();
+				Exception e = _eventPump.Stop();
 				_eventPump = null;
+
+				if (e != null) {
+					if (e is BuildException) {
+						throw new BuildException(e.Message, 
+							((BuildException)e).Location,
+							e.InnerException);
+					} else {
+						throw new BuildException("One or more errors occurred in the <multitask> threads; check log output above this line for details.  The first (and possibly only) error encountered was:",
+							Location,
+							e);
+					}
+				}
 			}
 		}
     }
