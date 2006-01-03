@@ -19,13 +19,15 @@ namespace MultiTask
 	/// </summary>
 	internal class AsyncProject
 	{
+        String _logSrcName;
 		Project _project;
 		String _target;
 		Thread _thread;
 		ManualCloseLogEventQueue _logEventQueue;
 
-		public AsyncProject(Project proj, String target, ManualCloseLogEventQueue q)
+		public AsyncProject(String logSrcName, Project proj, String target, ManualCloseLogEventQueue q)
 		{
+            _logSrcName = logSrcName;
 			_project = proj;
 			_target = target;
 			_thread = null;
@@ -59,9 +61,9 @@ namespace MultiTask
 			//the main execution thread and pumped into the 
 			_logEventQueue.Install(_project, _target);
 			try {
-				_project.Execute(_target);
+				_project.Execute();
 			} catch (Exception e) {
-				_logEventQueue.Enqueue(new LogEvent(_project, e));
+				_logEventQueue.Enqueue(new LogEvent(_logSrcName, _project, e));
 			} finally {
 				_logEventQueue.Close();
 			}

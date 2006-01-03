@@ -16,22 +16,15 @@ namespace MultiTask
 {
     [TaskName("multitask")]
     class MultiTask : TaskContainer {
-        /// <summary>The thread on which the async execution of the tasks within the multitask.</summary>
-//		Thread _execThread;
-//        Project _forkedProj;
-        const String MULTITASK_TARGET_NAME = "multitask-generated-target";
+        const String DEFAULT_MULTITASK_TARGET_NAME = "multitask-generated-target";
 
-//        /// <summary>Blocks the caller until the multitask finishes running.  Returns immediately
-//        ///     if the multitask is not currently running.</summary>
-//		internal void WaitForCompletion() {
-//			if (_execThread != null) {
-//				if (_execThread.IsAlive) {
-//					_execThread.Join();
-//				}
-//
-//				_execThread = null;
-//			}
-//		}
+        String _taskName;
+
+        [TaskAttribute("name")]
+        public String TaskName {
+            get { return _taskName; }
+            set { _taskName = value; }
+        }
 
 		/// <summary>
 		/// Automatically exclude build elements that are defined on the task
@@ -41,9 +34,6 @@ namespace MultiTask
 		/// <param name="taskNode"><see cref="XmlNode" /> used to initialize the container.</param>
 		protected override void InitializeTask(XmlNode taskNode) {
 			base.InitializeTask(taskNode);
-
-//			_execThread = null;
-//			_forkedProj = null;
 		}
 
 
@@ -56,13 +46,13 @@ namespace MultiTask
 		/// </remarks>
 		protected override void ExecuteTask() {
 			MultiTasks mt = FindMultiTasksAncestor();
-			Project forkedProj = Fork();			
-			mt.RunProjectAsync("multitask-todo-elaborate", forkedProj, MULTITASK_TARGET_NAME);
-		}
 
-//		private void ExecuteForkedProject() {
-//            _forkedProj.Execute(MULTITASK_TARGET_NAME);
-//		}
+            String taskName = mt.GenerateMultitaskName(_taskName == null ? DEFAULT_MULTITASK_TARGET_NAME : _taskName);
+
+            Project forkedProj = Fork(taskName);
+
+            mt.RunProject(taskName, forkedProj, taskName);
+		}
 
         /// <summary>Walks the task ancestry looking for the nearest <code>multitasks</code> task.</summary>
         /// 
@@ -82,11 +72,11 @@ namespace MultiTask
 			throw new BuildException("multitask cannot be used outside of multitasks", Location);
 		}
 
-		private Project Fork() {			
+		private Project Fork(String multitaskTargetName) {			
 			//Duplicate the current project in a new Project object
 			Project forkedProj = CreateForkedProject();
 
-			Target targ = CreateMultitaskTarget(forkedProj);
+            Target targ = CreateMultitaskTarget(forkedProj, multitaskTargetName);
 
 			SetDefaultTarget(targ, forkedProj);
 
@@ -143,37 +133,49 @@ namespace MultiTask
 			return forkedProj;
 		}
 
-		private Target CreateMultitaskTarget(Project proj) {
-
+        private Target CreateMultitaskTarget(Project proj, String multitaskTargetName) {
 			//Create a new target which will contain the tasks from the <multitask>
 			//To preserve line numbers as much as possible, build the Target object
 			//from the XmlNode for this task; it shouldn't work, but it does, since
 			//the Initialize() method for each NAnt element assumes the node being passed to it
 			//is the right type.
 
-			//Add a 'name' property so the 'target' will be identifiable
-			XmlAttribute name = XmlNode.OwnerDocument.CreateAttribute("name");
-			name.Value = MULTITASK_TARGET_NAME;
-			XmlNode.Attributes.Append(name);
+			//Change the 'name' property so the 'target' will be identifiable
+            XmlAttribute name = XmlNode.Attributes["name"];
+            String oldName = null;
+            if (name == null) {
+                name = XmlNode.OwnerDocument.CreateAttribute("name");
+            } else {
+                oldName = name.Value;
+            }
 
-			//Add the document to the project's location map.  Normally, Project.Execute()
-			//will do this, however Target.Initialize() needs the location map to be
-			//populated already, so the line number of the Target element can be computed
-			proj.LocationMap.Add(proj.xml.Document);
+            try {
+                name.Value = multitaskTargetName;
+                XmlNode.Attributes.Append(name);
 
-			Target targ = new Target();
-			targ.Project = proj;
-			targ.NamespaceManager = NamespaceManager;
-			targ.Initialize(XmlNode); 
+                Target targ = new Target();
+                targ.Project = proj;
+                targ.NamespaceManager = NamespaceManager;
+                targ.Initialize(XmlNode);
 
-			//Remove the 'name' attribute to get the node back to the way it should be
-			XmlNode.Attributes.Remove(name);
+                return targ;
+            } finally {
+                //Restore the previous name
+                if (oldName == null) {
+                    XmlNode.Attributes.Remove(name);
+                } else {
+                    name.Value = oldName;
+                }
+            }
 
-			return targ;
 		} 
 
 		private void SetDefaultTarget(Target targ, Project proj) {
 			proj.Targets.Add(targ);
+
+            //Replace any existing build targets with this target
+            proj.BuildTargets.Clear();
+            proj.BuildTargets.Add(targ.Name);
 		}
     }
 }

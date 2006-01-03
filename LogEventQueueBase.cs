@@ -72,34 +72,34 @@ namespace MultiTask
 			if (e.Target != null && e.Target.Name == _hideTarget) {
 				return;
 			}
-			Enqueue(new LogEvent(sender, e, LogEventType.TargetFinished));
+            Enqueue(new LogEvent(_src, sender, e, LogEventType.TargetFinished));
 		}
 
 		public void MessageLogged(object sender, BuildEventArgs e) {
-			Enqueue(new LogEvent(sender, e, LogEventType.MessageLogged));
+            Enqueue(new LogEvent(_src, sender, e, LogEventType.MessageLogged));
 		}
 
 		public void BuildStarted(object sender, BuildEventArgs e) {
-			Enqueue(new LogEvent(sender, e, LogEventType.BuildStarted));
+            Enqueue(new LogEvent(_src, sender, e, LogEventType.BuildStarted));
 		}
 
 		public void BuildFinished(object sender, BuildEventArgs e) {
-			Enqueue(new LogEvent(sender, e, LogEventType.BuildFinished));
+            Enqueue(new LogEvent(_src, sender, e, LogEventType.BuildFinished));
 		}
 
 		public void TaskFinished(object sender, BuildEventArgs e) {
-			Enqueue(new LogEvent(sender, e, LogEventType.TaskFinished));
+            Enqueue(new LogEvent(_src, sender, e, LogEventType.TaskFinished));
 		}
 
 		public void TargetStarted(object sender, BuildEventArgs e) {
 			if (e.Target != null && e.Target.Name == _hideTarget) {
 				return;
 			}
-			Enqueue(new LogEvent(sender, e, LogEventType.TargetStarted));
+            Enqueue(new LogEvent(_src, sender, e, LogEventType.TargetStarted));
 		}
 
 		public void TaskStarted(object sender, BuildEventArgs e) {
-			Enqueue(new LogEvent(sender, e, LogEventType.TaskStarted));
+            Enqueue(new LogEvent(_src, sender, e, LogEventType.TaskStarted));
 		}
 
 		#endregion

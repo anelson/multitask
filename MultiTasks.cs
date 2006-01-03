@@ -14,34 +14,59 @@ namespace MultiTask
 {
     [TaskName("multitasks")]
     class MultiTasks : TaskContainer {
-//		ArrayList _childMultiTasks;
         LogEventQueueList _logEventQueueList;
 		ArrayList _asyncProjects;
 		LogEventPump _eventPump;
+        ArrayList _multitaskNames;
+        bool _serialize;
 
-//        /// <summary>Called by a MultiTask when it is about to run, to register itself with its parent
-//        ///     MultiTasks element.</summary>
-//        /// 
-//        /// <param name="child"></param>
-//		internal LogEventQueue ReportChildMultiTask(MultiTask child) {
-//			LogEventQueue q = new LogEventQueue(child);
-//
-//			_childMultiTasks.Add(child);
-//			_logEventQueueList.Add(q);
-//
-//			return q;
-//		}
+        /// <summary>
+        /// Forces child &lt;multitask&gt; elements to run sequentially instead of concurrently.
+        /// This is equivalent to omitting the multitasks/multitask elements and calling each task 
+        /// sequentially in the build file.
+        /// 
+        /// Defaults to <c>false</c>; set to <c>true</c> during testing and when troubleshooting, to 
+        /// eliminate threading complications as a potential cause.
+        /// </summary>
+        [TaskAttribute("serialize")]
+        [BooleanValidator()]
+        public bool Serialize
+        {
+            get { return _serialize; }
+            set { _serialize = value; }
+        }
 
-		internal void RunProjectAsync(String threadName, Project proj, String targetName) {
-			ManualCloseLogEventQueue q = new ManualCloseLogEventQueue(threadName);
-			AsyncProject ap = new AsyncProject(proj, targetName, q);
+        internal String GenerateMultitaskName(String baseName) {
+            //If the base name is not already in the list, add it then return it
+            if (!_multitaskNames.Contains(baseName)) {
+                _multitaskNames.Add(baseName);
+                return baseName;
+            }
 
-			_logEventQueueList.Add(q);
-			_asyncProjects.Add(ap);
+            //Else, append a decimal number to make a unique name
+            int counter = 1;
+            while (_multitaskNames.Contains(String.Format("{0} ({1})", baseName, counter))) {
+                counter++;
+            }
 
-			ap.Start();
+            _multitaskNames.Add(String.Format("{0} ({1})", baseName, counter));
+            return String.Format("{0} ({1})", baseName, counter);
+        }
 
-			InstallNewAutoCloseEventListener();
+		internal void RunProject(String threadName, Project proj, String targetName) {
+            ManualCloseLogEventQueue q = new ManualCloseLogEventQueue(threadName);
+            AsyncProject ap = new AsyncProject(threadName, proj, targetName, q);
+
+            _logEventQueueList.Add(q);
+            _asyncProjects.Add(ap);
+
+            ap.Start();
+
+            InstallNewAutoCloseEventListener();
+
+            if (_serialize) {
+                ap.WaitForFinish();
+            }
 		}
 
 		/// <summary>
@@ -55,6 +80,7 @@ namespace MultiTask
 
             _logEventQueueList = new LogEventQueueList();
 			_asyncProjects = new ArrayList();
+            _multitaskNames = new ArrayList();
 		}
 
 		/// <summary>
@@ -130,7 +156,6 @@ namespace MultiTask
 				if (e != null) {
 					if (e is BuildException) {
 						throw new BuildException(e.Message, 
-							((BuildException)e).Location,
 							e.InnerException);
 					} else {
 						throw new BuildException("One or more errors occurred in the <multitask> threads; check log output above this line for details.  The first (and possibly only) error encountered was:",

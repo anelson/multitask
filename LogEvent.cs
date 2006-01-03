@@ -20,21 +20,24 @@ namespace MultiTask
 	/// </summary>
 	internal class LogEvent
 	{
+        String _sourceName;
 		Object _sender;
 		BuildEventArgs _args;
 		LogEventType _eventType;
 		Exception _exception;
 		Project _project;
 
-		public LogEvent(Object sender, BuildEventArgs args, LogEventType eventType)
+		public LogEvent(String sourceName, Object sender, BuildEventArgs args, LogEventType eventType)
 		{
+            _sourceName = sourceName;
 			_sender = sender;
 			_args = args;
 			_eventType = eventType;
 			_exception = null;
 		}
 
-		public LogEvent(Project project, Exception exception) : this(project, null, LogEventType.Exception) {
+        public LogEvent(String sourceName, Project project, Exception exception)
+            : this(sourceName, project, null, LogEventType.Exception) {
 			_project = project;
 			_exception = exception;
 		}
