@@ -239,3 +239,16 @@ Now it's kind-of working, but working on getting line number info to propagate.
 BaseURI isn't set on Target element, so trying to get it to use existing
 element instead, but still not quite there.
 
+---
+
+Got it working thanks to some sleight-of-hand and implementation-specific assumptions.
+
+Now implementing a serialized option in <multitasks>, for testing, which will run tasks
+in the main thread.
+
+GOTCHA: When defining TaskAttribute's of type 'bool', need to add the 'BooleanValidator' attribute, else
+property will always be false 
+
+GOTCHA: InitializeTask runs /after/ TaskAttribute's are set to values from build file, so don't initialize the
+corresponding fields else you'll blow away the values from the build file
+
